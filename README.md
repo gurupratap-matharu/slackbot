@@ -2,32 +2,30 @@
 
 Bots are a useful way to interact with chat services such as Slack. Let's build a simple Slack bot to whom you can send commands using Python using the Slack-API.
 
-Our Weapons
+## Our Weapons
 Our bot, whom we'll call "Merlin Bot", requires Python and the Slack API. To run our Python code we need:
 
-Python3
-pip and virtualenv to handle Python application dependencies
-Free Slack account - you need to be signed into at least one workspace where you have access to building apps.
+## Python3
+## pip and virtualenv to handle Python application dependencies
+## Free Slack account - you need to be signed into at least one workspace where you have access to building apps.
 It is also useful to have the Slack API docs handy while you're building this tutorial.
 
-Establishing Our Environment
+## Establishing Our Environment
 Go to the terminal (or Command Prompt on Windows) and change into the directory where you want to store this project. Call the directory slackbot
 Within that directory, create a new virtualenv to isolate our application dependencies from other Python projects.
+
 virtualenv venv
 Activate the virtualenv:
 
 source venv/bin/activate
-Your prompt should now look like the one in this screenshot.
 
 
 The official slackclient API helper library built by Slack can send and receive messages from a Slack channel. Install the slackclient library with the pip command:
 
-pip install slackclient
+```pip install slackclient
 When pip is finished you should see output like this and you'll be back at the prompt.
 
 Upgrade pip to 18 if it prompts and see my pip list details below.
-
-
 
 
 We also need to create a Slack App to recieve an API token for your bot. Use "Merlin Bot" as your App name. If you are signed into more than one workspace, pick a Development Workspace from the dropdown.
@@ -35,7 +33,7 @@ We also need to create a Slack App to recieve an API token for your bot. Use "Me
 
 Matharu is my Workspace yours would be different. After submitting the form, keep the app configuration page open.
 
-Slack APIs and App Configuration
+## Slack APIs and App Configuration
 We want our Merlin Bot to appear like any other user in your team - it will participate in conversations inside channels, groups, and DMs.
 
 In a Slack App, this is called a bot user, which we set up by choosing "Bot Users" under the "Features" section. After clicking "Add a Bot User", you should choose a display name, choose a default username, and save your choices by clicking "Add Bot User". You'll end up with a page that looks like the following:
@@ -54,41 +52,10 @@ A common practice for Python developers is to export secret tokens as environmen
 export SLACK_BOT_TOKEN='your bot user access token here'
 
 
-
 Nice, now we are authorized to use the Slack RTM and Web APIs as a bot user.
 
-Coding Our Merlin Bot
-We've got everything we need to write the Merlin Bot code. Create a new file named merlinbot.py and include the following code in it.
-
-import os
-import time
-import re
-from slackclient import SlackClient
-With our dependencies imported we can use them to obtain the environment variable values and then instantiate the Slack client.
-
-# instantiate Slack client
-slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
-# merlinbot's user ID in Slack: value is assigned after the bot starts up
-merlinbot_id = None
-
-# constants
-RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
-EXAMPLE_COMMAND = "do"
-MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
 The code instantiates the SlackClient client with our SLACK_BOT_TOKEN exported as an environment variable. It also declares a variable we can use to store the Slack user ID of our Merlin Bot. A few constants are also declared, and each of them will be explained as they are used in the code that follows.
 
-if __name__ == "__main__":
-    if slack_client.rtm_connect(with_team_state=False):
-        print("Merlin Bot connected and running!")
-        # Read bot's user ID by calling Web API method `auth.test`
-        merlinbot_id = slack_client.api_call("auth.test")["user_id"]
-        while True:
-            command, channel = parse_bot_commands(slack_client.rtm_read())
-            if command:
-                handle_command(command, channel)
-            time.sleep(RTM_READ_DELAY)
-    else:
-        print("Connection failed. Exception traceback printed above.")
 The Slack client connects to the Slack RTM API. Once it's connected, it calls a Web API method (auth.test) to find Merlin Bot's user ID.
 
 Each bot user has a user ID for each workspace the Slack App is installed within. Storing this user ID will help the program understand if someone has mentioned the bot in a message.
@@ -99,6 +66,7 @@ For each event that is read, the parse_bot_commands() function determines if the
 
 We've laid the groundwork for processing Slack events and calling Slack methods in the program. Next, add three new functions above the previous snippet to complete handling commands:
 
+```
 def parse_bot_commands(slack_events):"""
         Parses a list of events coming from the Slack RTM API to find bot commands.
         If a bot command is found, this function returns a tuple of command and channel.
@@ -140,81 +108,12 @@ The parse_direct_mentions() function uses a regular expression to determine if a
 
 The last function, handle_command() is where in the future you'll add all the interesting commands, humor, and personality for Merlin Bot. For now, it has just one example command: do. If the command starts with a known command, it will have an appropriate response. If not, a default response is used. The response is sent back to Slack by calling the chat.postMessage Web API method with the channel.
 
-
-
-import os
-import time
-import re
-from slackclient import SlackClient
-
-
-# instantiate Slack client
-slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
-# merlinbot's user ID in Slack: value is assigned after the bot starts up
-merlinbot_id = None
-
-# constants
-RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
-EXAMPLE_COMMAND = "do"
-MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
-
-def parse_bot_commands(slack_events):"""
-        Parses a list of events coming from the Slack RTM API to find bot commands.
-        If a bot command is found, this function returns a tuple of command and channel.
-        If its not found, then this function returns None, None.
-    """for event in slack_events:
-        if event["type"] == "message" and not "subtype" in event:
-            user_id, message = parse_direct_mention(event["text"])
-            if user_id == merlinbot_id:
-                return message, event["channel"]
-    return None, None
-
-def parse_direct_mention(message_text):"""
-        Finds a direct mention (a mention that is at the beginning) in message text
-        and returns the user ID which was mentioned. If there is no direct mention, returns None
-    """
-    matches = re.search(MENTION_REGEX, message_text)
-    # the first group contains the username, the second group contains the remaining messagereturn (matches.group(1), matches.group(2).strip()) if matches else (None, None)
-
-def handle_command(command, channel):"""
-        Executes bot command if the command is known
-    """# Default response is help text for the user
-    default_response = "Not sure what you mean. Try *{}*.".format(EXAMPLE_COMMAND)
-
-    # Finds and executes the given command, filling in response
-    response = None# This is where you start to implement more commands!if command.startswith(EXAMPLE_COMMAND):
-        response = "Sure...write some more code then I can do that!"
-
-    # Sends the response back to the channel
-    slack_client.api_call(
-        "chat.postMessage",
-        channel=channel,
-        text=response or default_response
-    )
-
-if __name__ == "__main__":
-    if slack_client.rtm_connect(with_team_state=False):
-        print("Merlin Bot connected and running!")
-        # Read bot's user ID by calling Web API method `auth.test`
-        merlinbot_id = slack_client.api_call("auth.test")["user_id"]
-        while True:
-            command, channel = parse_bot_commands(slack_client.rtm_read())
-            if command:
-                handle_command(command, channel)
-            time.sleep(RTM_READ_DELAY)
-    else:
-        print("Connection failed. Exception traceback printed above.")
 Now that all of our code is in place we can run our Merlin Bot on the command line
 
-python merlinbot.py
+```python merlinbot.py
 
 In Slack, create a new channel and invite Merlin Bot or invite it to an existing channel.
 
 
-
-Now start giving Merlin Bot commands in your channel. All the code for this tutorial is available on my Github public repository
-
-
-
-Chat bots are a great tool to automate repetitive processes. In future most sales will be done by Chat bots!
+## Chat bots are a great tool to automate repetitive processes. In future most sales will be done by Chat bots!
 
